@@ -1,5 +1,5 @@
 // Cache the app shell so it opens offline; refresh the cache in the background.
-const CACHE = 'minimal-todo-v1';
+const CACHE = 'minimal-todo-v2';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
 self.addEventListener('activate', e => e.waitUntil(
