@@ -1,4 +1,4 @@
-// To Do — Mac app (window + menu bar panel) around the web app in ../index.html.
+// Daytick — Mac app (window + menu bar panel) around the web app in ../index.html.
 // Serves the bundled web files from a custom app:// scheme so localStorage persists.
 import Cocoa
 import WebKit
@@ -55,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         popover.behavior = .transient
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "checkmark.square", accessibilityDescription: "To Do")
+        statusItem.button?.image = NSImage(systemSymbolName: "checkmark.square", accessibilityDescription: "Daytick")
         statusItem.button?.action = #selector(clicked)
         statusItem.button?.target = self
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
-        window.title = "To Do"
+        window.title = "Daytick"
         window.titlebarAppearsTransparent = true
         window.backgroundColor = NSColor(red: 0x22/255, green: 0x22/255, blue: 0x22/255, alpha: 1)
         window.isReleasedWhenClosed = false
@@ -126,13 +126,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
     func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Open To Do", action: #selector(showWindow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Open Daytick", action: #selector(showWindow), keyEquivalent: "").target = self
         let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(.separator())
         menu.addItem(withTitle: "Shortcut: ⌥⌘T", action: nil, keyEquivalent: "").isEnabled = false
-        menu.addItem(withTitle: "Quit To Do", action: #selector(NSApp.terminate), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Daytick", action: #selector(NSApp.terminate), keyEquivalent: "q")
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             else { try SMAppService.mainApp.register() }
         } catch {
             let a = NSAlert(); a.messageText = "Couldn't change Open at Login"
-            a.informativeText = "Move To Do into Applications and try again.\n\n\(error.localizedDescription)"
+            a.informativeText = "Move Daytick into Applications and try again.\n\n\(error.localizedDescription)"
             a.runModal()
         }
     }
@@ -172,8 +172,8 @@ app.setActivationPolicy(.regular)
 let mainMenu = NSMenu(), appItem = NSMenuItem(), editItem = NSMenuItem(), windowItem = NSMenuItem()
 mainMenu.addItem(appItem); mainMenu.addItem(editItem); mainMenu.addItem(windowItem)
 let appMenu = NSMenu(); appItem.submenu = appMenu
-appMenu.addItem(withTitle: "Hide To Do", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-appMenu.addItem(withTitle: "Quit To Do", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+appMenu.addItem(withTitle: "Hide Daytick", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+appMenu.addItem(withTitle: "Quit Daytick", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 let windowMenu = NSMenu(title: "Window"); windowItem.submenu = windowMenu
 windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

@@ -1,6 +1,6 @@
 {
-  "name": "Minimal Todo",
-  "short_name": "Todo",
+  "name": "Daytick",
+  "short_name": "Daytick",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

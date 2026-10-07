@@ -1,11 +1,11 @@
 #!/bin/sh
-# Builds "To Do.app" into mac/build/. Run from anywhere: ./mac/build.sh
+# Builds "Daytick.app" into mac/build/. Run from anywhere: ./mac/build.sh
 set -e
 cd "$(dirname "$0")"
-APP="build/To Do.app"
+APP="build/Daytick.app"
 rm -rf build && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web"
 
-swiftc -O main.swift -o "$APP/Contents/MacOS/ToDo"
+swiftc -O main.swift -o "$APP/Contents/MacOS/Daytick"
 cp ../index.html ../icon.svg ../icon-512.png "$APP/Contents/Resources/web/"
 
 # App icon from icon-512.png
@@ -20,9 +20,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleName</key><string>To Do</string>
+  <key>CFBundleName</key><string>Daytick</string>
   <key>CFBundleIdentifier</key><string>io.github.o1ie12.todo</string>
-  <key>CFBundleExecutable</key><string>ToDo</string>
+  <key>CFBundleExecutable</key><string>Daytick</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
