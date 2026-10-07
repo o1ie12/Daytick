@@ -53,9 +53,9 @@
   .stat b { display:block; font:400 48px/1 Anton, Impact, sans-serif; }
   .stat small { color:var(--muted); font-size:12px; text-transform:lowercase; }
   .heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,13px); grid-auto-columns:13px; gap:3px; }
-  /* --i (0–1) is the day's share of your busiest day; empty days stay --h0 */
+  /* --i (0–1) is the day's brightness step; empty days stay --h0 */
   .heat button { border-radius:2px; background:var(--h0); }
-  .heat button[style] { background:color-mix(in srgb, var(--heat) calc(20% + var(--i) * 70%), var(--h0)); }
+  .heat button[style] { background:color-mix(in srgb, var(--heat) calc(25% + var(--i) * 75%), var(--h0)); }
   .heat button.sel { outline:2px solid var(--fg); outline-offset:1px; }
   .heat .pad { visibility:hidden; }
   .day { margin-top:28px; max-width:300px; }
@@ -149,7 +149,8 @@
 
     // Heatmap: WEEKS columns, Sunday-first rows, ending with the current week
     const now = new Date(), start = addDays(now, -now.getDay() - (WEEKS - 1) * 7);
-    const max = Math.max(1, ...Object.values(perDay));
+    // Fixed brightness steps: 1, 2–3, 4–6, 7–9, 10+ tasks
+    const level = n => n >= 10 ? 1 : n >= 7 ? .75 : n >= 4 ? .5 : n >= 2 ? .25 : 0;
     const cells = [];
     for (let i = 0; i < WEEKS * 7; i++) {
       const day = addDays(start, i), k = ymd(day), n = perDay[k] || 0;
@@ -158,7 +159,7 @@
         title: `${n} done · ${day.toLocaleDateString(undefined, { month:'short', day:'numeric' })}`,
         className: k === selected ? 'sel' : ''
       });
-      if (n) b.style.setProperty('--i', (n / max).toFixed(2));
+      if (n) b.style.setProperty('--i', level(n));
       b.onclick = () => { selected = selected === k ? null : k; render(); };
       cells.push(b);
     }
