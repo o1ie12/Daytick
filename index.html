@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Todo</title>
+<style>
+  :root { --bg:#fafafa; --fg:#1a1a1a; --muted:#999; --line:#e5e5e5; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111; --fg:#eee; --muted:#666; --line:#2a2a2a; --accent:#60a5fa; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,sans-serif; }
+  main { max-width:520px; margin:0 auto; padding:48px 16px; }
+  h1 { font-size:24px; font-weight:600; margin:0 0 24px; }
+  form input { width:100%; padding:12px 0; font:inherit; color:inherit; background:none; border:0; border-bottom:1px solid var(--line); outline:none; }
+  form input:focus { border-color:var(--accent); }
+  ul { list-style:none; padding:0; margin:16px 0; }
+  li { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  li span { flex:1; word-break:break-word; cursor:text; }
+  li.done span { color:var(--muted); text-decoration:line-through; }
+  input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; }
+  button { background:none; border:0; color:var(--muted); font:inherit; cursor:pointer; padding:4px; }
+  button:hover { color:var(--fg); }
+  li button { opacity:0; } li:hover button { opacity:1; }
+  @media (hover:none) { li button { opacity:1; } }
+  footer { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Todo</h1>
+  <form id="f"><input id="new" placeholder="What needs doing?" autocomplete="off" autofocus></form>
+  <ul id="list"></ul>
+  <footer><span id="count"></span><button id="clear">Clear completed</button></footer>
+</main>
+<script>
+  const KEY = 'minimal-todo';
+  let todos = [];
+  try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(todos)); } catch {} };
+  const $ = id => document.getElementById(id);
+
+  function render() {
+    $('list').innerHTML = '';
+    todos.forEach((t, i) => {
+      const li = document.createElement('li');
+      li.className = t.done ? 'done' : '';
+      const cb = Object.assign(document.createElement('input'), { type:'checkbox', checked:t.done });
+      cb.onchange = () => { t.done = cb.checked; update(); };
+      const span = Object.assign(document.createElement('span'), { textContent:t.text, title:'Double-click to edit' });
+      span.ondblclick = () => {
+        span.contentEditable = true; span.focus();
+        const commit = () => { const v = span.textContent.trim(); v ? t.text = v : todos.splice(i, 1); update(); };
+        span.onblur = commit;
+        span.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } if (e.key === 'Escape') { span.textContent = t.text; span.blur(); } };
+      };
+      const del = Object.assign(document.createElement('button'), { textContent:'✕', title:'Delete' });
+      del.onclick = () => { todos.splice(i, 1); update(); };
+      li.append(cb, span, del);
+      $('list').append(li);
+    });
+    const left = todos.filter(t => !t.done).length;
+    $('count').textContent = todos.length ? `${left} left` : 'Nothing to do';
+  }
+  function update() { save(); render(); }
+
+  $('f').onsubmit = e => {
+    e.preventDefault();
+    const text = $('new').value.trim();
+    if (text) { todos.push({ text, done:false }); $('new').value = ''; update(); }
+  };
+  $('clear').onclick = () => { todos = todos.filter(t => !t.done); update(); };
+  render();
+</script>
+</body>
+</html>
