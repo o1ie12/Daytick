@@ -70,6 +70,21 @@
     .grid { grid-template-columns:1fr; gap:56px; }
     aside { width:100%; overflow-x:auto; }
   }
+  /* Compact layout for the menu bar panel and small windows */
+  @media (max-width:500px) {
+    body { font-size:14px; }
+    .wrap { padding:20px 18px; } header { margin-bottom:20px; } h1 { font-size:30px; }
+    .grid { gap:28px; }
+    form input { padding:6px 1px; border-bottom-width:1.5px; }
+    ul { margin-top:16px; } li { gap:12px; padding:6px 0; }
+    .box { width:18px; height:18px; border-width:2px; }
+    .box:checked::after { width:7px; height:3px; border-width:0 0 2px 2px; }
+    .count { margin-top:12px; font-size:12px; }
+    .streak { gap:24px; margin-bottom:14px; }
+    .stat b { font-size:26px; } .stat small { font-size:11px; }
+    .heat { grid-template-rows:repeat(7,9px); grid-auto-columns:9px; gap:2px; }
+    .day { margin-top:16px; } .day li { font-size:13px; }
+  }
 </style>
 <script>
   // Apply saved theme before paint (default: dark)

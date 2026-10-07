@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler(), forURLScheme: "app")
         config.websiteDataStore = .default()
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 440, height: 640), configuration: config)
+        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 340, height: 460), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.load(URLRequest(url: URL(string: "app://todo/index.html")!))
 
