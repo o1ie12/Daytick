@@ -94,17 +94,23 @@
   :root[data-compact] aside { width:100%; }
 
   /* Menu bar "minimal" layout: list only, with a side panel that opens to the right */
-  :root[data-ctx=panel][data-menubar=minimal] .wrap { padding-right:34px; }
+  :root[data-ctx=panel][data-menubar=minimal] .wrap { padding-right:42px; }
   :root[data-ctx=panel][data-menubar=minimal] aside { display:none; }
   :root[data-ctx=panel][data-menubar=minimal][data-side] .grid { grid-template-columns:288px 1fr; gap:28px; }
   :root[data-ctx=panel][data-menubar=minimal][data-side] aside { display:block; border-left:1px solid var(--line); padding-left:24px; }
-  .side-tab { display:none; position:fixed; top:0; right:0; bottom:0; width:22px; border-left:1px solid var(--line); color:var(--muted); font-size:13px; }
-  .side-tab:hover { color:var(--fg); background:var(--line); }
+  .side-tab { display:none; position:fixed; top:50%; right:8px; width:26px; height:26px; margin-top:-13px; border-radius:50%;
+    border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:14px; line-height:1;
+    box-shadow:0 1px 4px rgba(0,0,0,.15); transition:color .15s, border-color .15s, transform .15s; }
+  :root[data-settings] .side-tab { display:none; }
+  .side-tab:hover { color:var(--fg); border-color:var(--muted); transform:scale(1.08); }
   :root[data-ctx=panel][data-menubar=minimal] .side-tab { display:block; }
 
   /* Settings */
   .settings-link { display:block; margin-top:40px; font-size:12px; color:var(--muted); text-transform:lowercase; }
   .settings-link:hover { color:var(--fg); }
+  .back { font-size:14px; font-weight:500; padding:4px 0; }
+  .back:hover { opacity:.7; }
+  #settings > h2:first-of-type { margin-top:20px; }
   #settings h2 { font:400 13px/1 Archivo, sans-serif; color:var(--muted); text-transform:lowercase; margin:28px 0 10px; }
   .seg { display:inline-flex; border:1.5px solid var(--fg); }
   .seg button { padding:6px 16px; font-size:14px; }
@@ -147,6 +153,7 @@
     </aside>
   </div>
   <section id="settings" hidden>
+    <button class="back" id="closeSettings">← back</button>
     <h2>font size</h2>
     <div class="seg" data-setting="font"><button data-v="s">S</button><button data-v="m">M</button><button data-v="l">L</button></div>
     <div class="mac-only">
@@ -166,7 +173,6 @@
       Free and open source under the MIT license. Your tasks stay on your device.</p>
     <p><a href="https://github.com/o1ie12/ToDo" target="_blank" rel="noopener">github.com/o1ie12/ToDo</a></p>
 
-    <button class="settings-link" id="closeSettings">← back</button>
   </section>
 </div>
 <button class="side-tab" id="sideTab" title="Streak and history">‹</button>
@@ -295,7 +301,7 @@
     try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {}
     applySettings();
   });
-  const showSettings = on => { $('settings').hidden = !on; $('main').hidden = on; };
+  const showSettings = on => { $('settings').hidden = !on; $('main').hidden = on; document.documentElement.toggleAttribute('data-settings', on); scrollTo(0, 0); };
   $('version').textContent = 'v' + VERSION;
   $('openSettings').onclick = () => showSettings(true);
   $('closeSettings').onclick = () => showSettings(false);
