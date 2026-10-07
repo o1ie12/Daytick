@@ -13,11 +13,11 @@
 <style>
   :root {
     --bg:#222; --fg:#fff; --muted:#8a8a8a; --line:#3a3a3a;
-    --h0:#2e2e2e; --h1:#4a4a4a; --h2:#7a7a7a; --h3:#b5b5b5; --h4:#fff;
+    --h0:#2e2e2e; --heat:#ff7a3d;
   }
   :root[data-theme=light] {
     --bg:#f4f4f2; --fg:#1a1a1a; --muted:#777; --line:#d8d8d4;
-    --h0:#e4e4e0; --h1:#c4c4c0; --h2:#8e8e8a; --h3:#555; --h4:#1a1a1a;
+    --h0:#e4e4e0; --heat:#f05a1a;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); }
@@ -53,9 +53,9 @@
   .stat b { display:block; font:400 48px/1 Anton, Impact, sans-serif; }
   .stat small { color:var(--muted); font-size:12px; text-transform:lowercase; }
   .heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,13px); grid-auto-columns:13px; gap:3px; }
+  /* --i (0–1) is the day's share of your busiest day; empty days stay --h0 */
   .heat button { border-radius:2px; background:var(--h0); }
-  .heat button[data-l="1"] { background:var(--h1); } .heat button[data-l="2"] { background:var(--h2); }
-  .heat button[data-l="3"] { background:var(--h3); } .heat button[data-l="4"] { background:var(--h4); }
+  .heat button[style] { background:color-mix(in srgb, var(--heat) calc(25% + var(--i) * 75%), var(--h0)); }
   .heat button.sel { outline:2px solid var(--fg); outline-offset:1px; }
   .heat .pad { visibility:hidden; }
   .day { margin-top:28px; max-width:300px; }
@@ -149,6 +149,7 @@
 
     // Heatmap: WEEKS columns, Sunday-first rows, ending with the current week
     const now = new Date(), start = addDays(now, -now.getDay() - (WEEKS - 1) * 7);
+    const max = Math.max(1, ...Object.values(perDay));
     const cells = [];
     for (let i = 0; i < WEEKS * 7; i++) {
       const day = addDays(start, i), k = ymd(day), n = perDay[k] || 0;
@@ -157,7 +158,7 @@
         title: `${n} done · ${day.toLocaleDateString(undefined, { month:'short', day:'numeric' })}`,
         className: k === selected ? 'sel' : ''
       });
-      b.dataset.l = n === 0 ? 0 : n < 2 ? 1 : n < 4 ? 2 : n < 6 ? 3 : 4;
+      if (n) b.style.setProperty('--i', (n / max).toFixed(2));
       b.onclick = () => { selected = selected === k ? null : k; render(); };
       cells.push(b);
     }
