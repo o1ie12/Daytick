@@ -4,72 +4,115 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Todo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
 <style>
   :root { --bg:#fafafa; --fg:#1a1a1a; --muted:#999; --line:#e5e5e5; --accent:#2563eb; }
   @media (prefers-color-scheme: dark) { :root { --bg:#111; --fg:#eee; --muted:#666; --line:#2a2a2a; --accent:#60a5fa; } }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,sans-serif; }
   main { max-width:520px; margin:0 auto; padding:48px 16px; }
-  h1 { font-size:24px; font-weight:600; margin:0 0 24px; }
+  nav { display:flex; gap:20px; margin-bottom:24px; }
+  nav button { font-size:24px; font-weight:600; padding:0; color:var(--muted); }
+  nav button.active { color:var(--fg); }
   form input { width:100%; padding:12px 0; font:inherit; color:inherit; background:none; border:0; border-bottom:1px solid var(--line); outline:none; }
   form input:focus { border-color:var(--accent); }
   ul { list-style:none; padding:0; margin:16px 0; }
   li { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
   li span { flex:1; word-break:break-word; cursor:text; }
   li.done span { color:var(--muted); text-decoration:line-through; }
+  h2 { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:28px 0 0; }
   input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; }
   button { background:none; border:0; color:var(--muted); font:inherit; cursor:pointer; padding:4px; }
   button:hover { color:var(--fg); }
   li button { opacity:0; } li:hover button { opacity:1; }
   @media (hover:none) { li button { opacity:1; } }
-  footer { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; }
+  footer { color:var(--muted); font-size:14px; }
+  .empty { color:var(--muted); padding:16px 0; }
+  [hidden] { display:none !important; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Todo</h1>
-  <form id="f"><input id="new" placeholder="What needs doing?" autocomplete="off" autofocus></form>
-  <ul id="list"></ul>
-  <footer><span id="count"></span><button id="clear">Clear completed</button></footer>
+  <nav><button id="tabToday" class="active">Today</button><button id="tabHistory">History</button></nav>
+  <section id="today">
+    <form id="f"><input id="new" placeholder="What needs doing?" autocomplete="off" autofocus></form>
+    <ul id="list"></ul>
+    <footer id="count"></footer>
+  </section>
+  <section id="history" hidden></section>
 </main>
 <script>
   const KEY = 'minimal-todo';
+  // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
   let todos = [];
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
+  todos.forEach(t => { t.id ??= crypto.randomUUID(); if (t.done && !t.doneOn) t.doneOn = today(); });
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(todos)); } catch {} };
   const $ = id => document.getElementById(id);
 
+  function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); }
+  const isArchived = t => t.done && t.doneOn < today();
+
+  function row(t) {
+    const li = document.createElement('li');
+    li.className = t.done ? 'done' : '';
+    const cb = Object.assign(document.createElement('input'), { type:'checkbox', checked:t.done });
+    cb.onchange = () => { t.done = cb.checked; t.doneOn = t.done ? today() : null; update(); };
+    const span = Object.assign(document.createElement('span'), { textContent:t.text, title:'Double-click to edit' });
+    span.ondblclick = () => {
+      span.contentEditable = true; span.focus();
+      span.onblur = () => { const v = span.textContent.trim(); v ? t.text = v : remove(t); update(); };
+      span.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } if (e.key === 'Escape') { span.textContent = t.text; span.blur(); } };
+    };
+    const del = Object.assign(document.createElement('button'), { textContent:'✕', title:'Delete' });
+    del.onclick = () => { remove(t); update(); };
+    li.append(cb, span, del);
+    return li;
+  }
+  const remove = t => { todos = todos.filter(x => x !== t); };
+
   function render() {
-    $('list').innerHTML = '';
-    todos.forEach((t, i) => {
-      const li = document.createElement('li');
-      li.className = t.done ? 'done' : '';
-      const cb = Object.assign(document.createElement('input'), { type:'checkbox', checked:t.done });
-      cb.onchange = () => { t.done = cb.checked; update(); };
-      const span = Object.assign(document.createElement('span'), { textContent:t.text, title:'Double-click to edit' });
-      span.ondblclick = () => {
-        span.contentEditable = true; span.focus();
-        const commit = () => { const v = span.textContent.trim(); v ? t.text = v : todos.splice(i, 1); update(); };
-        span.onblur = commit;
-        span.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } if (e.key === 'Escape') { span.textContent = t.text; span.blur(); } };
-      };
-      const del = Object.assign(document.createElement('button'), { textContent:'✕', title:'Delete' });
-      del.onclick = () => { todos.splice(i, 1); update(); };
-      li.append(cb, span, del);
-      $('list').append(li);
-    });
-    const left = todos.filter(t => !t.done).length;
-    $('count').textContent = todos.length ? `${left} left` : 'Nothing to do';
+    const active = todos.filter(t => !isArchived(t));
+    $('list').replaceChildren(...active.map(row));
+    const left = active.filter(t => !t.done).length;
+    $('count').textContent = active.length ? `${left} left` : 'Nothing to do';
+
+    const groups = {};
+    todos.filter(isArchived).forEach(t => (groups[t.doneOn] ??= []).push(t));
+    const days = Object.keys(groups).sort().reverse();
+    $('history').replaceChildren(...(days.length ? days.flatMap(d => {
+      const h = Object.assign(document.createElement('h2'), {
+        textContent: new Date(d + 'T00:00').toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' })
+      });
+      const ul = document.createElement('ul');
+      ul.append(...groups[d].map(row));
+      return [h, ul];
+    }) : [Object.assign(document.createElement('p'), { className:'empty', textContent:'Completed tasks from earlier days show up here.' })]));
   }
   function update() { save(); render(); }
+
+  function show(tab) {
+    $('today').hidden = tab !== 'today'; $('history').hidden = tab !== 'history';
+    $('tabToday').classList.toggle('active', tab === 'today');
+    $('tabHistory').classList.toggle('active', tab === 'history');
+  }
+  $('tabToday').onclick = () => show('today');
+  $('tabHistory').onclick = () => show('history');
 
   $('f').onsubmit = e => {
     e.preventDefault();
     const text = $('new').value.trim();
-    if (text) { todos.push({ text, done:false }); $('new').value = ''; update(); }
+    if (text) { todos.push({ id:crypto.randomUUID(), text, done:false, doneOn:null }); $('new').value = ''; update(); }
   };
-  $('clear').onclick = () => { todos = todos.filter(t => !t.done); update(); };
+  // Re-render when the app regains focus, so yesterday's completed tasks move to History after midnight
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   render();
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
 </script>
 </body>
 </html>
