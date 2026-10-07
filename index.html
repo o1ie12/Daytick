@@ -13,11 +13,11 @@
 <style>
   :root {
     --bg:#222; --fg:#fff; --muted:#8a8a8a; --line:#3a3a3a;
-    --h0:#2e2e2e; --heat:#ff7a3d;
+    --h0:#2e2e2e; --heat:#c9805f;
   }
   :root[data-theme=light] {
     --bg:#f4f4f2; --fg:#1a1a1a; --muted:#777; --line:#d8d8d4;
-    --h0:#e4e4e0; --heat:#f05a1a;
+    --h0:#e4e4e0; --heat:#b5654a;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); }
@@ -55,7 +55,7 @@
   .heat { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,13px); grid-auto-columns:13px; gap:3px; }
   /* --i (0–1) is the day's share of your busiest day; empty days stay --h0 */
   .heat button { border-radius:2px; background:var(--h0); }
-  .heat button[style] { background:color-mix(in srgb, var(--heat) calc(25% + var(--i) * 75%), var(--h0)); }
+  .heat button[style] { background:color-mix(in srgb, var(--heat) calc(20% + var(--i) * 70%), var(--h0)); }
   .heat button.sel { outline:2px solid var(--fg); outline-offset:1px; }
   .heat .pad { visibility:hidden; }
   .day { margin-top:28px; max-width:300px; }
