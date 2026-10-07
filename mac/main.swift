@@ -1,4 +1,4 @@
-// To Do — menu bar wrapper around the web app in ../index.html.
+// To Do — Mac app (window + menu bar panel) around the web app in ../index.html.
 // Serves the bundled web files from a custom app:// scheme so localStorage persists.
 import Cocoa
 import WebKit
@@ -25,26 +25,31 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     let popover = NSPopover()
-    var webView: WKWebView!
-    var window: NSWindow?
+    var window: NSWindow!
     var hotKey: EventHotKeyRef?
 
-    func applicationDidFinishLaunching(_ n: Notification) {
+    // Each view gets its own web view; they share one data store, and the page
+    // listens for storage events, so the window and the panel stay in sync.
+    func makeWebView(size: NSSize) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler(), forURLScheme: "app")
         config.websiteDataStore = .default()
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 340, height: 460), configuration: config)
-        webView.setValue(false, forKey: "drawsBackground")
-        webView.load(URLRequest(url: URL(string: "app://todo/index.html")!))
+        let wv = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: config)
+        wv.setValue(false, forKey: "drawsBackground")
+        wv.load(URLRequest(url: URL(string: "app://todo/index.html")!))
+        return wv
+    }
 
-        let vc = NSViewController(); vc.view = webView
+    func applicationDidFinishLaunching(_ n: Notification) {
+        // Menu bar panel
+        let panelView = makeWebView(size: NSSize(width: 340, height: 460))
+        let vc = NSViewController(); vc.view = panelView
         popover.contentViewController = vc
-        popover.contentSize = webView.frame.size
+        popover.contentSize = panelView.frame.size
         popover.behavior = .transient
-        popover.appearance = NSAppearance(named: .darkAqua)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "checkmark.square", accessibilityDescription: "To Do")
@@ -52,65 +57,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem.button?.target = self
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
+        // Main window
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                          backing: .buffered, defer: false)
+        window.title = "To Do"
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = NSColor(red: 0x22/255, green: 0x22/255, blue: 0x22/255, alpha: 1)
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 340, height: 400)
+        window.contentView = makeWebView(size: window.frame.size)
+        window.setFrameAutosaveName("MainWindow")
+        if !window.setFrameUsingName("MainWindow") { window.center() }
+        showWindow()
+
         registerHotKey()
     }
 
-    @objc func clicked() {
-        if NSApp.currentEvent?.type == .rightMouseUp { showMenu() } else { toggle() }
+    // Clicking the Dock icon reopens the window after it was closed
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { showWindow() }
+        return true
     }
 
-    @objc func toggle() {
-        if let w = window { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+    @objc func showWindow() {
+        popover.performClose(nil)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func clicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp { showMenu() } else { togglePanel() }
+    }
+
+    @objc func togglePanel() {
         if popover.isShown { popover.performClose(nil); return }
         guard let button = statusItem.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
         popover.contentViewController?.view.window?.makeKey()
-        webView.evaluateJavaScript("document.getElementById('new')?.focus()")
+        (popover.contentViewController?.view as? WKWebView)?.evaluateJavaScript("document.getElementById('new')?.focus()")
     }
 
     func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: window == nil ? "Open in Window" : "Back to Menu Bar",
-                     action: #selector(toggleWindow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Open To Do", action: #selector(showWindow), keyEquivalent: "").target = self
         let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(.separator())
         menu.addItem(withTitle: "Shortcut: ⌥⌘T", action: nil, keyEquivalent: "").isEnabled = false
-        menu.addItem(withTitle: "Quit", action: #selector(NSApp.terminate), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit To Do", action: #selector(NSApp.terminate), keyEquivalent: "q")
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
-    }
-
-    // Moves the single web view between the popover and a regular window.
-    @objc func toggleWindow() {
-        if let w = window { w.close(); return }
-        popover.performClose(nil)
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
-                         styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                         backing: .buffered, defer: false)
-        w.title = "To Do"
-        w.titlebarAppearsTransparent = true
-        w.backgroundColor = NSColor(red: 0x22/255, green: 0x22/255, blue: 0x22/255, alpha: 1)
-        w.isReleasedWhenClosed = false
-        w.delegate = self
-        popover.contentViewController?.view = NSView()
-        w.contentView = webView
-        w.center()
-        window = w
-        NSApp.setActivationPolicy(.regular)
-        w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func windowWillClose(_ n: Notification) {
-        window?.contentView = NSView()
-        popover.contentViewController?.view = webView
-        webView.frame.size = popover.contentSize
-        window = nil
-        NSApp.setActivationPolicy(.accessory)
     }
 
     @objc func toggleLogin() {
@@ -124,12 +124,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    // Global ⌥⌘T via Carbon hot keys (no Accessibility permission needed).
+    // Global ⌥⌘T toggles the menu bar panel (Carbon hot keys need no Accessibility permission).
     func registerHotKey() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
             let me = Unmanaged<AppDelegate>.fromOpaque(ctx!).takeUnretainedValue()
-            DispatchQueue.main.async { me.toggle() }
+            DispatchQueue.main.async { me.togglePanel() }
             return noErr
         }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
         RegisterEventHotKey(UInt32(kVK_ANSI_T), UInt32(cmdKey | optionKey),
@@ -141,11 +141,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(.regular)
 
 // Standard Edit menu so ⌘C/⌘V/⌘A/⌘Z work in the text field
-let mainMenu = NSMenu(), editItem = NSMenuItem()
-mainMenu.addItem(editItem)
+let mainMenu = NSMenu(), appItem = NSMenuItem(), editItem = NSMenuItem(), windowItem = NSMenuItem()
+mainMenu.addItem(appItem); mainMenu.addItem(editItem); mainMenu.addItem(windowItem)
+let appMenu = NSMenu(); appItem.submenu = appMenu
+appMenu.addItem(withTitle: "Hide To Do", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+appMenu.addItem(withTitle: "Quit To Do", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+let windowMenu = NSMenu(title: "Window"); windowItem.submenu = windowMenu
+windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
 let edit = NSMenu(title: "Edit"); editItem.submenu = edit
 edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
 edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")

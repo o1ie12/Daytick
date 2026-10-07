@@ -212,6 +212,14 @@
   };
   setThemeLabel();
 
+  // Keep multiple open copies (e.g. Mac app window + menu bar panel) in sync
+  window.addEventListener('storage', e => {
+    if (e.key === KEY) { try { todos = JSON.parse(e.newValue) || []; } catch {} render(); }
+    if (e.key === 'minimal-todo-theme') {
+      e.newValue === 'light' ? document.documentElement.dataset.theme = 'light' : delete document.documentElement.dataset.theme;
+      setThemeLabel();
+    }
+  });
   // Re-render when the app regains focus, so yesterday's completed tasks archive after midnight
   document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   render();
