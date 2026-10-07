@@ -72,16 +72,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.contentView = makeWebView(size: window.frame.size, ctx: "window")
         window.setFrameAutosaveName("MainWindow")
         if !window.setFrameUsingName("MainWindow") { window.center() }
-        showWindow()
+        applyDockPolicy()
+        if showInDock { showWindow() }
 
         registerHotKey()
     }
 
-    // The page asks to widen the menu bar panel when its side panel opens
+    // Messages from the page: panel width, Dock visibility, open the window
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let w = body["panelWidth"] as? Double,
-              message.webView === popover.contentViewController?.view else { return }
-        popover.contentSize = NSSize(width: w, height: popover.contentSize.height)
+        guard let body = message.body as? [String: Any] else { return }
+        if let w = body["panelWidth"] as? Double, message.webView === popover.contentViewController?.view {
+            popover.contentSize = NSSize(width: w, height: popover.contentSize.height)
+        }
+        if let dock = body["dock"] as? Bool, dock != showInDock {
+            showInDock = dock
+            applyDockPolicy()
+        }
+        if body["open"] as? String == "window" { showWindow() }
+    }
+
+    // Remembered natively too, so a menu-bar-only launch doesn't flash the window or Dock icon
+    var showInDock: Bool {
+        get { UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "showInDock") }
+    }
+
+    func applyDockPolicy() {
+        NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+        // Switching to .accessory hides the app's windows; bring the window back if it was open
+        if window.isVisible { DispatchQueue.main.async { self.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) } }
     }
 
     // Links to the web (About, Updates) open in the default browser
@@ -166,7 +185,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.regular)
 
 // Standard Edit menu so ⌘C/⌘V/⌘A/⌘Z work in the text field
 let mainMenu = NSMenu(), appItem = NSMenuItem(), editItem = NSMenuItem(), windowItem = NSMenuItem()

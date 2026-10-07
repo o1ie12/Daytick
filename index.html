@@ -83,6 +83,7 @@
   :root[data-compact] li { gap:12px; padding:6px 0; }
   :root[data-compact] .box { width:18px; height:18px; border-width:2px; }
   :root[data-compact] .box:checked::after { width:7px; height:3px; border-width:0 0 2px 2px; }
+  :root[data-compact] .links { margin-top:28px; }
   :root[data-compact] .count { margin-top:12px; font-size:12px; }
   :root[data-compact] .streak { gap:24px; margin-bottom:14px; }
   :root[data-compact] .stat b { font-size:26px; }
@@ -101,13 +102,15 @@
   .side-tab { display:none; position:fixed; top:50%; right:8px; width:26px; height:26px; margin-top:-13px; border-radius:50%;
     border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:14px; line-height:1;
     box-shadow:0 1px 4px rgba(0,0,0,.15); transition:color .15s, border-color .15s, transform .15s; }
-  :root[data-settings] .side-tab { display:none; }
+  :root[data-settings] .side-tab { display:none !important; }
   .side-tab:hover { color:var(--fg); border-color:var(--muted); transform:scale(1.08); }
   :root[data-ctx=panel][data-menubar=minimal] .side-tab { display:block; }
 
   /* Settings */
   .settings-link { display:block; margin-top:40px; font-size:12px; color:var(--muted); text-transform:lowercase; }
   .settings-link:hover { color:var(--fg); }
+  .links { display:flex; gap:20px; margin-top:40px; } .links .settings-link { margin-top:0; }
+  :root:not([data-ctx=panel]) .panel-only { display:none; }
   .back { font-size:14px; font-weight:500; padding:4px 0; }
   .back:hover { opacity:.7; }
   #settings > h2:first-of-type { margin-top:20px; }
@@ -140,7 +143,7 @@
       <form id="f"><input id="new" placeholder="what’s next?" autocomplete="off" autofocus></form>
       <ul id="list"></ul>
       <div class="count" id="count"></div>
-      <button class="settings-link" id="openSettings">settings</button>
+      <div class="links"><button class="settings-link" id="openSettings">settings</button><button class="settings-link panel-only" id="openApp">open daytick ↗</button></div>
     </section>
     <aside>
       <div class="streak">
@@ -160,6 +163,9 @@
       <h2>menu bar layout</h2>
       <div class="seg" data-setting="menubar"><button data-v="minimal">minimal</button><button data-v="full">full</button></div>
       <p>Minimal shows only your list in the menu bar, with a side panel for your streak and history. The app window always shows everything.</p>
+      <h2>show in dock</h2>
+      <div class="seg" data-setting="dock"><button data-v="on">on</button><button data-v="off">off</button></div>
+      <p>Off keeps Daytick in the menu bar only. Open the full app from the button at the bottom of the menu bar panel.</p>
     </div>
     <h2>updates</h2>
     <ul class="changelog">
@@ -180,7 +186,7 @@
   const KEY = 'minimal-todo', SKEY = 'minimal-todo-settings', WEEKS = 20;
   // Where the page is running: 'panel' (Mac menu bar), 'window' (Mac app) or null (browser)
   const ctx = new URLSearchParams(location.search).get('ctx');
-  let settings = { font:'m', menubar:'full' };
+  let settings = { font:'m', menubar:'full', dock:'on' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
   let sideOpen = false;
   const PANEL_W = 340, SIDE_W = 300, VERSION = '1.0';
@@ -293,7 +299,9 @@
     document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b =>
       b.classList.toggle('on', settings[seg.dataset.setting] === b.dataset.v)));
     // Ask the Mac app to resize the menu bar panel
-    if (ctx === 'panel') window.webkit?.messageHandlers?.todo?.postMessage({ panelWidth: PANEL_W + (sideOpen ? SIDE_W : 0) });
+    const mac = window.webkit?.messageHandlers?.todo;
+    if (ctx === 'panel') mac?.postMessage({ panelWidth: PANEL_W + (sideOpen ? SIDE_W : 0) });
+    mac?.postMessage({ dock: settings.dock !== 'off' });
   }
   document.querySelectorAll('.seg').forEach(seg => seg.onclick = e => {
     const v = e.target.dataset.v; if (!v) return;
@@ -305,6 +313,7 @@
   $('version').textContent = 'v' + VERSION;
   $('openSettings').onclick = () => showSettings(true);
   $('closeSettings').onclick = () => showSettings(false);
+  $('openApp').onclick = () => window.webkit?.messageHandlers?.todo?.postMessage({ open: 'window' });
   $('sideTab').onclick = () => { sideOpen = !sideOpen; applySettings(); };
   matchMedia('(max-width:500px)').addEventListener('change', applySettings);
   applySettings();
