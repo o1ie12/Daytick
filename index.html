@@ -66,25 +66,57 @@
   .day p { color:var(--muted); font-size:14px; margin:0; }
 
   @media (max-width:900px) {
-    .wrap { padding:32px 16px; } header { margin-bottom:40px; } h1 { font-size:48px; }
-    .grid { grid-template-columns:1fr; gap:56px; }
-    aside { width:100%; overflow-x:auto; }
+    :root:not([data-ctx=panel]) .wrap { padding:32px 16px; }
+    :root:not([data-ctx=panel]) header { margin-bottom:40px; }
+    :root:not([data-ctx=panel]) h1 { font-size:48px; }
+    :root:not([data-ctx=panel]) .grid { grid-template-columns:1fr; gap:56px; }
+    :root:not([data-ctx=panel]) aside { width:100%; overflow-x:auto; }
   }
-  /* Compact layout for the menu bar panel and small windows */
-  @media (max-width:500px) {
-    body { font-size:14px; }
-    .wrap { padding:20px 18px; } header { margin-bottom:20px; } h1 { font-size:30px; }
-    .grid { gap:28px; }
-    form input { padding:6px 1px; border-bottom-width:1.5px; }
-    ul { margin-top:16px; } li { gap:12px; padding:6px 0; }
-    .box { width:18px; height:18px; border-width:2px; }
-    .box:checked::after { width:7px; height:3px; border-width:0 0 2px 2px; }
-    .count { margin-top:12px; font-size:12px; }
-    .streak { gap:24px; margin-bottom:14px; }
-    .stat b { font-size:26px; } .stat small { font-size:11px; }
-    .heat { grid-template-rows:repeat(7,9px); grid-auto-columns:9px; gap:2px; }
-    .day { margin-top:16px; } .day li { font-size:13px; }
-  }
+  /* Compact layout for the menu bar panel and small windows (set by JS) */
+  :root[data-compact] body { font-size:14px; }
+  :root[data-compact] .wrap { padding:20px 18px; }
+  :root[data-compact] header { margin-bottom:20px; }
+  :root[data-compact] h1 { font-size:30px; }
+  :root[data-compact] .grid { gap:28px; }
+  :root[data-compact] form input { padding:6px 1px; border-bottom-width:1.5px; }
+  :root[data-compact] ul { margin-top:16px; }
+  :root[data-compact] li { gap:12px; padding:6px 0; }
+  :root[data-compact] .box { width:18px; height:18px; border-width:2px; }
+  :root[data-compact] .box:checked::after { width:7px; height:3px; border-width:0 0 2px 2px; }
+  :root[data-compact] .count { margin-top:12px; font-size:12px; }
+  :root[data-compact] .streak { gap:24px; margin-bottom:14px; }
+  :root[data-compact] .stat b { font-size:26px; }
+  :root[data-compact] .stat small { font-size:11px; }
+  :root[data-compact] .heat { grid-template-rows:repeat(7,9px); grid-auto-columns:9px; gap:2px; }
+  :root[data-compact] .day { margin-top:16px; }
+  :root[data-compact] .day li { font-size:13px; }
+  :root[data-compact] .grid { grid-template-columns:1fr; }
+  :root[data-compact] aside { width:100%; }
+
+  /* Menu bar "minimal" layout: list only, with a side panel that opens to the right */
+  :root[data-ctx=panel][data-menubar=minimal] .wrap { padding-right:34px; }
+  :root[data-ctx=panel][data-menubar=minimal] aside { display:none; }
+  :root[data-ctx=panel][data-menubar=minimal][data-side] .grid { grid-template-columns:288px 1fr; gap:28px; }
+  :root[data-ctx=panel][data-menubar=minimal][data-side] aside { display:block; border-left:1px solid var(--line); padding-left:24px; }
+  .side-tab { display:none; position:fixed; top:0; right:0; bottom:0; width:22px; border-left:1px solid var(--line); color:var(--muted); font-size:13px; }
+  .side-tab:hover { color:var(--fg); background:var(--line); }
+  :root[data-ctx=panel][data-menubar=minimal] .side-tab { display:block; }
+
+  /* Settings */
+  .settings-link { display:block; margin-top:40px; font-size:12px; color:var(--muted); text-transform:lowercase; }
+  .settings-link:hover { color:var(--fg); }
+  #settings h2 { font:400 13px/1 Archivo, sans-serif; color:var(--muted); text-transform:lowercase; margin:28px 0 10px; }
+  .seg { display:inline-flex; border:1.5px solid var(--fg); }
+  .seg button { padding:6px 16px; font-size:14px; }
+  .seg button + button { border-left:1.5px solid var(--fg); }
+  .seg button.on { background:var(--fg); color:var(--bg); }
+  #settings p { color:var(--muted); font-size:12px; margin:8px 0 0; max-width:300px; }
+  :root:not([data-ctx]) .mac-only { display:none; }
+  #settings a { color:var(--fg); text-underline-offset:3px; }
+  #settings .about-name { color:var(--fg); font-weight:500; }
+  .changelog { margin:0; max-width:340px; } .changelog li { display:block; padding:2px 0; font-size:13px; color:var(--muted); }
+  .changelog b { color:var(--fg); font-weight:500; }
+  [hidden] { display:none !important; }
 </style>
 <script>
   // Apply saved theme before paint (default: dark)
@@ -97,11 +129,12 @@
     <h1>TO DO</h1>
     <button class="theme" id="theme" aria-label="Toggle light and dark mode"><span id="themeLabel">dark</span><span class="switch"></span></button>
   </header>
-  <div class="grid">
+  <div class="grid" id="main">
     <section>
       <form id="f"><input id="new" placeholder="what’s next?" autocomplete="off" autofocus></form>
       <ul id="list"></ul>
       <div class="count" id="count"></div>
+      <button class="settings-link" id="openSettings">settings</button>
     </section>
     <aside>
       <div class="streak">
@@ -113,9 +146,38 @@
       <div class="day" id="day"></div>
     </aside>
   </div>
+  <section id="settings" hidden>
+    <h2>font size</h2>
+    <div class="seg" data-setting="font"><button data-v="s">S</button><button data-v="m">M</button><button data-v="l">L</button></div>
+    <div class="mac-only">
+      <h2>menu bar layout</h2>
+      <div class="seg" data-setting="menubar"><button data-v="minimal">minimal</button><button data-v="full">full</button></div>
+      <p>Minimal shows only your list in the menu bar, with a side panel for your streak and history. The app window always shows everything.</p>
+    </div>
+    <h2>updates</h2>
+    <ul class="changelog">
+      <li><b>1.0</b> · Oct 2026 — first release: daily list, streak heatmap, light and dark themes, Mac app with menu bar panel.</li>
+    </ul>
+    <p><a href="https://github.com/o1ie12/ToDo/releases" target="_blank" rel="noopener">check for updates →</a></p>
+
+    <h2>about</h2>
+    <p><b class="about-name">To Do</b> <span id="version"></span><br>
+      A minimal to-do list. Write down what's next, tick it off, watch the days fill in.<br>
+      Free and open source under the MIT license. Your tasks stay on your device.</p>
+    <p><a href="https://github.com/o1ie12/ToDo" target="_blank" rel="noopener">github.com/o1ie12/ToDo</a></p>
+
+    <button class="settings-link" id="closeSettings">← back</button>
+  </section>
 </div>
+<button class="side-tab" id="sideTab" title="Streak and history">‹</button>
 <script>
-  const KEY = 'minimal-todo', WEEKS = 20;
+  const KEY = 'minimal-todo', SKEY = 'minimal-todo-settings', WEEKS = 20;
+  // Where the page is running: 'panel' (Mac menu bar), 'window' (Mac app) or null (browser)
+  const ctx = new URLSearchParams(location.search).get('ctx');
+  let settings = { font:'m', menubar:'full' };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
+  let sideOpen = false;
+  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.0';
   // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
   let todos = [], selected = null;
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
@@ -212,9 +274,39 @@
   };
   setThemeLabel();
 
+  function applySettings() {
+    const root = document.documentElement;
+    root.style.zoom = { s:.88, m:1, l:1.15 }[settings.font] || 1;
+    if (ctx) root.dataset.ctx = ctx;
+    root.dataset.menubar = settings.menubar;
+    const minimal = ctx === 'panel' && settings.menubar === 'minimal';
+    if (!minimal) sideOpen = false;
+    sideOpen ? root.dataset.side = '' : delete root.dataset.side;
+    root.toggleAttribute('data-compact', ctx === 'panel' || matchMedia('(max-width:500px)').matches);
+    $('sideTab').textContent = sideOpen ? '›' : '‹';
+    document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b =>
+      b.classList.toggle('on', settings[seg.dataset.setting] === b.dataset.v)));
+    // Ask the Mac app to resize the menu bar panel
+    if (ctx === 'panel') window.webkit?.messageHandlers?.todo?.postMessage({ panelWidth: PANEL_W + (sideOpen ? SIDE_W : 0) });
+  }
+  document.querySelectorAll('.seg').forEach(seg => seg.onclick = e => {
+    const v = e.target.dataset.v; if (!v) return;
+    settings[seg.dataset.setting] = v;
+    try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {}
+    applySettings();
+  });
+  const showSettings = on => { $('settings').hidden = !on; $('main').hidden = on; };
+  $('version').textContent = 'v' + VERSION;
+  $('openSettings').onclick = () => showSettings(true);
+  $('closeSettings').onclick = () => showSettings(false);
+  $('sideTab').onclick = () => { sideOpen = !sideOpen; applySettings(); };
+  matchMedia('(max-width:500px)').addEventListener('change', applySettings);
+  applySettings();
+
   // Keep multiple open copies (e.g. Mac app window + menu bar panel) in sync
   window.addEventListener('storage', e => {
     if (e.key === KEY) { try { todos = JSON.parse(e.newValue) || []; } catch {} render(); }
+    if (e.key === SKEY) { try { Object.assign(settings, JSON.parse(e.newValue)); } catch {} applySettings(); }
     if (e.key === 'minimal-todo-theme') {
       e.newValue === 'light' ? document.documentElement.dataset.theme = 'light' : delete document.documentElement.dataset.theme;
       setThemeLabel();

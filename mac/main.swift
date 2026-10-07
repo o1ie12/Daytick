@@ -25,7 +25,7 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var statusItem: NSStatusItem!
     let popover = NSPopover()
     var window: NSWindow!
@@ -33,19 +33,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Each view gets its own web view; they share one data store, and the page
     // listens for storage events, so the window and the panel stay in sync.
-    func makeWebView(size: NSSize) -> WKWebView {
+    func makeWebView(size: NSSize, ctx: String) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.userContentController.add(self, name: "todo")
         config.setURLSchemeHandler(SchemeHandler(), forURLScheme: "app")
         config.websiteDataStore = .default()
         let wv = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: config)
         wv.setValue(false, forKey: "drawsBackground")
-        wv.load(URLRequest(url: URL(string: "app://todo/index.html")!))
+        wv.navigationDelegate = self
+        wv.uiDelegate = self
+        wv.load(URLRequest(url: URL(string: "app://todo/index.html?ctx=\(ctx)")!))
         return wv
     }
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Menu bar panel
-        let panelView = makeWebView(size: NSSize(width: 340, height: 460))
+        let panelView = makeWebView(size: NSSize(width: 340, height: 460), ctx: "panel")
         let vc = NSViewController(); vc.view = panelView
         popover.contentViewController = vc
         popover.contentSize = panelView.frame.size
@@ -66,12 +69,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = NSColor(red: 0x22/255, green: 0x22/255, blue: 0x22/255, alpha: 1)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 340, height: 400)
-        window.contentView = makeWebView(size: window.frame.size)
+        window.contentView = makeWebView(size: window.frame.size, ctx: "window")
         window.setFrameAutosaveName("MainWindow")
         if !window.setFrameUsingName("MainWindow") { window.center() }
         showWindow()
 
         registerHotKey()
+    }
+
+    // The page asks to widen the menu bar panel when its side panel opens
+    func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any], let w = body["panelWidth"] as? Double,
+              message.webView === popover.contentViewController?.view else { return }
+        popover.contentSize = NSSize(width: w, height: popover.contentSize.height)
+    }
+
+    // Links to the web (About, Updates) open in the default browser
+    func webView(_ wv: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let url = action.request.url, url.scheme == "https" || url.scheme == "http",
+           action.navigationType == .linkActivated || action.targetFrame == nil {
+            NSWorkspace.shared.open(url); decisionHandler(.cancel); return
+        }
+        decisionHandler(.allow)
+    }
+    func webView(_ wv: WKWebView, createWebViewWith c: WKWebViewConfiguration, for action: WKNavigationAction,
+                 windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = action.request.url { NSWorkspace.shared.open(url) }
+        return nil
     }
 
     // Clicking the Dock icon reopens the window after it was closed
