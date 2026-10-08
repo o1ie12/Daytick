@@ -1,5 +1,5 @@
 // Cache the app shell so it opens offline; refresh the cache in the background.
-const CACHE = 'daytick-v1.2';
+const CACHE = 'daytick-v1.2.1';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-512.png', 'fonts/anton.woff2', 'fonts/archivo.woff2'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
 self.addEventListener('activate', e => e.waitUntil(

@@ -201,6 +201,7 @@
 
     <h2>updates</h2>
     <ul class="changelog">
+      <li><b>1.2.1</b> · Oct 2026 — the menu bar panel now opens over full-screen apps and on every desktop.</li>
       <li><b>1.2</b> · Oct 2026 — tasks-left count in the menu bar, full keyboard control, welcome tasks for new users.</li>
       <li><b>1.1</b> · Oct 2026 — drag tasks to reorder, back up and restore your data, fonts built in so Daytick works fully offline.</li>
       <li><b>1.0</b> · Oct 2026 — first release: daily list, streak heatmap, light and dark themes, Mac app with menu bar panel.</li>
@@ -223,7 +224,7 @@
   let settings = { font:'m', menubar:'full', dock:'on', count:'on' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
   let sideOpen = false;
-  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.2';
+  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.2.1';
   // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
   let todos = [], selected = null;
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}

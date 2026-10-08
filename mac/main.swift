@@ -26,9 +26,79 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
+// The menu bar panel. A non-activating floating panel (instead of NSPopover) so it opens
+// over full-screen apps and on every Space without switching you back to the desktop.
+final class MenuPanel: NSPanel {
+    private var clickMonitor: Any?
+
+    init(content: NSView) {
+        super.init(contentRect: NSRect(origin: .zero, size: content.frame.size),
+                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isFloatingPanel = true
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        hidesOnDeactivate = false
+        becomesKeyOnlyIfNeeded = false
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isReleasedWhenClosed = false
+        let container = NSView(frame: content.frame)
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 12
+        container.layer?.masksToBounds = true
+        content.autoresizingMask = [.width, .height]
+        container.addSubview(content)
+        contentView = container
+    }
+
+    override var canBecomeKey: Bool { true }
+
+    // An inactive app's Edit menu doesn't receive shortcuts, so handle the common ones here
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if mods == .command || mods == [.command, .shift], let key = event.charactersIgnoringModifiers?.lowercased() {
+            let actions: [String: Selector] = ["x": #selector(NSText.cut(_:)), "c": #selector(NSText.copy(_:)),
+                                               "v": #selector(NSText.paste(_:)), "a": #selector(NSText.selectAll(_:)),
+                                               "z": mods.contains(.shift) ? Selector(("redo:")) : Selector(("undo:"))]
+            if let action = actions[key], NSApp.sendAction(action, to: nil, from: self) { return true }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    var isShown: Bool { isVisible }
+
+    func show(below button: NSStatusBarButton) {
+        guard let buttonWindow = button.window else { return }
+        let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let screen = buttonWindow.screen ?? NSScreen.main!
+        var origin = NSPoint(x: anchor.midX - frame.width / 2, y: anchor.minY - frame.height - 6)
+        origin.x = min(max(origin.x, screen.visibleFrame.minX + 8), screen.visibleFrame.maxX - frame.width - 8)
+        setFrameOrigin(origin)
+        makeKeyAndOrderFront(nil)
+        // Close when clicking anywhere outside the app
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.performClose(nil)
+        }
+    }
+
+    override func performClose(_ sender: Any?) {
+        if let m = clickMonitor { NSEvent.removeMonitor(m); clickMonitor = nil }
+        orderOut(nil)
+    }
+
+    // Widen to the right (side panel), keeping the left edge and staying on screen
+    func setWidth(_ w: CGFloat) {
+        var f = frame
+        f.size.width = w
+        if let vf = screen?.visibleFrame, f.maxX > vf.maxX - 8 { f.origin.x = vf.maxX - 8 - w }
+        setFrame(f, display: true, animate: false)
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var statusItem: NSStatusItem!
-    let popover = NSPopover()
+    var popover: MenuPanel!
     var window: NSWindow!
     var hotKey: EventHotKeyRef?
 
@@ -50,10 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func applicationDidFinishLaunching(_ n: Notification) {
         // Menu bar panel
         let panelView = makeWebView(size: NSSize(width: 340, height: 460), ctx: "panel")
-        let vc = NSViewController(); vc.view = panelView
-        popover.contentViewController = vc
-        popover.contentSize = panelView.frame.size
-        popover.behavior = .transient
+        popover = MenuPanel(content: panelView)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "checkmark.square", accessibilityDescription: "Daytick")
@@ -83,8 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     // Messages from the page: panel width, Dock visibility, open the window
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
-        if let w = body["panelWidth"] as? Double, message.webView === popover.contentViewController?.view {
-            popover.contentSize = NSSize(width: w, height: popover.contentSize.height)
+        if let w = body["panelWidth"] as? Double, message.webView?.window === popover {
+            popover.setWidth(CGFloat(w))
         }
         if let dock = body["dock"] as? Bool, dock != showInDock {
             showInDock = dock
@@ -178,6 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    var panelWebView: WKWebView? { popover.contentView?.subviews.first as? WKWebView }
+
     @objc func clicked() {
         if NSApp.currentEvent?.type == .rightMouseUp { showMenu() } else { togglePanel() }
     }
@@ -185,10 +254,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     @objc func togglePanel() {
         if popover.isShown { popover.performClose(nil); return }
         guard let button = statusItem.button else { return }
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        NSApp.activate(ignoringOtherApps: true)
-        popover.contentViewController?.view.window?.makeKey()
-        (popover.contentViewController?.view as? WKWebView)?.evaluateJavaScript("document.getElementById('new')?.focus()")
+        popover.show(below: button)
+        panelWebView?.evaluateJavaScript("document.getElementById('new')?.focus()")
     }
 
     func showMenu() {
