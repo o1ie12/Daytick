@@ -8,9 +8,10 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#222222">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500&display=swap" rel="stylesheet">
 <style>
+  /* Fonts are bundled (SIL Open Font License, see fonts/) so the app works offline and makes no network requests */
+  @font-face { font-family:Anton; font-weight:400; font-display:swap; src:url(fonts/anton.woff2) format('woff2'); }
+  @font-face { font-family:Archivo; font-weight:100 900; font-display:swap; src:url(fonts/archivo.woff2) format('woff2'); }
   :root {
     --bg:#222; --fg:#fff; --muted:#8a8a8a; --line:#3a3a3a;
     --h0:#2e2e2e; --heat:#c9805f;
@@ -44,6 +45,11 @@
   .box { appearance:none; flex:none; width:26px; height:26px; margin:0; border:3px solid var(--fg); cursor:pointer; display:grid; place-content:center; }
   .box:checked { background:var(--fg); }
   .box:checked::after { content:''; width:10px; height:5px; border:solid var(--bg); border-width:0 0 3px 3px; transform:translateY(-2px) rotate(-45deg); }
+  #list li { cursor:grab; user-select:none; -webkit-user-select:none; touch-action:pan-x; }
+  #list li span[contenteditable=true] { user-select:text; -webkit-user-select:text; cursor:text; }
+  #list li.dragging { opacity:.35; }
+  #list li.over-before { box-shadow:0 -2px 0 var(--fg); }
+  #list li.over-after { box-shadow:0 2px 0 var(--fg); }
   .del { color:var(--muted); opacity:0; font-size:14px; } li:hover .del { opacity:1; } .del:hover { color:var(--fg); }
   @media (hover:none) { .del { opacity:1; } }
   .count { margin-top:24px; color:var(--muted); font-size:13px; }
@@ -111,6 +117,10 @@
   .settings-link:hover { color:var(--fg); }
   .links { display:flex; gap:20px; margin-top:40px; } .links .settings-link { margin-top:0; }
   :root:not([data-ctx=panel]) .panel-only { display:none; }
+  .row-btns { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { border:1.5px solid var(--fg); padding:6px 14px; font-size:14px; }
+  .btn:hover { background:var(--fg); color:var(--bg); }
+  #backupMsg:empty { display:none; }
   .back { font-size:14px; font-weight:500; padding:4px 0; }
   .back:hover { opacity:.7; }
   #settings > h2:first-of-type { margin-top:20px; }
@@ -167,8 +177,15 @@
       <div class="seg" data-setting="dock"><button data-v="on">on</button><button data-v="off">off</button></div>
       <p>Off keeps Daytick in the menu bar only. Open the full app from the button at the bottom of the menu bar panel.</p>
     </div>
+    <h2>backup</h2>
+    <div class="row-btns"><button class="btn" id="exportBtn">save backup</button><button class="btn" id="importBtn">restore…</button></div>
+    <p>Saves your tasks, history and settings to a file. Restoring replaces what's here now.</p>
+    <p id="backupMsg"></p>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+
     <h2>updates</h2>
     <ul class="changelog">
+      <li><b>1.1</b> · Oct 2026 — drag tasks to reorder, back up and restore your data, fonts built in so Daytick works fully offline.</li>
       <li><b>1.0</b> · Oct 2026 — first release: daily list, streak heatmap, light and dark themes, Mac app with menu bar panel.</li>
     </ul>
     <p><a href="https://github.com/o1ie12/Daytick/releases" target="_blank" rel="noopener">check for updates →</a></p>
@@ -189,7 +206,7 @@
   let settings = { font:'m', menubar:'full', dock:'on' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
   let sideOpen = false;
-  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.0';
+  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.1';
   // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
   let todos = [], selected = null;
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
@@ -204,8 +221,10 @@
   const isArchived = t => t.done && t.doneOn < today();
   const remove = t => { todos = todos.filter(x => x !== t); };
 
-  function row(t) {
+  function row(t, draggable = false) {
     const li = el('li', { className: t.done ? 'done' : '' });
+    li.dataset.id = t.id;
+    if (draggable) makeDraggable(li, t);
     const cb = el('input', { type:'checkbox', className:'box', checked:t.done });
     cb.onchange = () => { t.done = cb.checked; t.doneOn = t.done ? today() : null; update(); };
     const span = el('span', { textContent:t.text, title:'Double-click to edit' });
@@ -218,6 +237,40 @@
     del.onclick = () => { remove(t); update(); };
     li.append(cb, span, del);
     return li;
+  }
+
+  // Drag a task (press, then move a few pixels) to reorder; drops above or below the task under the pointer
+  function makeDraggable(li, t) {
+    li.onpointerdown = e => {
+      if (e.button !== 0 || e.target.closest('input, button, [contenteditable=true]')) return;
+      const startY = e.clientY; let dragging = false, target = null, after = false;
+      const clear = () => document.querySelectorAll('#list li').forEach(x => x.classList.remove('over-before', 'over-after'));
+      const move = ev => {
+        if (!dragging && Math.abs(ev.clientY - startY) < 5) return;
+        if (!dragging) { dragging = true; li.classList.add('dragging'); getSelection().removeAllRanges(); }
+        ev.preventDefault(); clear(); target = null;
+        for (const x of document.querySelectorAll('#list li')) {
+          const r = x.getBoundingClientRect();
+          if (x !== li && ev.clientY >= r.top && ev.clientY <= r.bottom) {
+            target = x; after = ev.clientY > r.top + r.height / 2;
+            x.classList.add(after ? 'over-after' : 'over-before');
+          }
+        }
+      };
+      const up = () => {
+        removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+        li.classList.remove('dragging'); clear();
+        if (dragging && target) moveTask(t.id, target.dataset.id, after);
+      };
+      addEventListener('pointermove', move); addEventListener('pointerup', up);
+    };
+  }
+  function moveTask(id, targetId, after) {
+    const from = todos.findIndex(x => x.id === id); if (from < 0 || id === targetId) return;
+    const [item] = todos.splice(from, 1);
+    const to = todos.findIndex(x => x.id === targetId);
+    todos.splice(after ? to + 1 : to, 0, item);
+    update();
   }
 
   function renderStats() {
@@ -259,12 +312,12 @@
     const done = todos.filter(t => t.done && t.doneOn === selected);
     const label = new Date(selected + 'T00:00').toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
     box.replaceChildren(el('h2', { textContent:label }),
-      done.length ? (() => { const ul = el('ul'); ul.append(...done.map(row)); return ul; })() : el('p', { textContent:'nothing done this day' }));
+      done.length ? (() => { const ul = el('ul'); ul.append(...done.map(t => row(t))); return ul; })() : el('p', { textContent:'nothing done this day' }));
   }
 
   function render() {
     const active = todos.filter(t => !isArchived(t));
-    $('list').replaceChildren(...active.map(row));
+    $('list').replaceChildren(...active.map(t => row(t, true)));
     const left = active.filter(t => !t.done).length;
     $('count').textContent = active.length ? `${left} left` : '';
     renderStats();
@@ -317,6 +370,48 @@
   $('sideTab').onclick = () => { sideOpen = !sideOpen; applySettings(); };
   matchMedia('(max-width:500px)').addEventListener('change', applySettings);
   applySettings();
+
+  // Backup: one JSON file with tasks, settings and theme
+  const THEME_KEY = 'minimal-todo-theme';
+  function backupJSON() {
+    let theme = null; try { theme = localStorage.getItem(THEME_KEY); } catch {}
+    return JSON.stringify({ app:'daytick', version:VERSION, exported:new Date().toISOString(), todos, settings, theme }, null, 2);
+  }
+  const backupMsg = m => { $('backupMsg').textContent = m; };
+  // Returns true on success; called by the Mac app too
+  window.restoreBackup = text => {
+    let d; try { d = JSON.parse(text); } catch { backupMsg("That file isn't a Daytick backup."); return false; }
+    if (d?.app !== 'daytick' || !Array.isArray(d.todos)) { backupMsg("That file isn't a Daytick backup."); return false; }
+    todos = d.todos.filter(t => t && typeof t.text === 'string').map(t => ({
+      id: t.id || crypto.randomUUID(), text: t.text, done: !!t.done, doneOn: t.done ? (t.doneOn || today()) : null
+    }));
+    if (d.settings) Object.assign(settings, d.settings);
+    try {
+      localStorage.setItem(SKEY, JSON.stringify(settings));
+      if (d.theme) localStorage.setItem(THEME_KEY, d.theme);
+    } catch {}
+    d.theme === 'light' ? document.documentElement.dataset.theme = 'light' : d.theme === 'dark' && delete document.documentElement.dataset.theme;
+    setThemeLabel(); applySettings(); update();
+    backupMsg(`Restored ${todos.length} task${todos.length === 1 ? '' : 's'}.`);
+    return true;
+  };
+  $('exportBtn').onclick = () => {
+    const json = backupJSON(), filename = `daytick-backup-${today()}.json`;
+    const mac = window.webkit?.messageHandlers?.todo;
+    if (mac) { mac.postMessage({ export: json, filename }); return; }
+    const a = el('a', { href: URL.createObjectURL(new Blob([json], { type:'application/json' })), download: filename });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    backupMsg('Backup saved.');
+  };
+  $('importBtn').onclick = () => {
+    const mac = window.webkit?.messageHandlers?.todo;
+    if (mac) mac.postMessage({ import: true }); else $('importFile').click();
+  };
+  $('importFile').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (file && confirm('Replace your current tasks with this backup?')) restoreBackup(await file.text());
+  };
+  window.backupSaved = () => backupMsg('Backup saved.');
 
   // Keep multiple open copies (e.g. Mac app window + menu bar panel) in sync
   window.addEventListener('storage', e => {

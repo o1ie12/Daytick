@@ -7,6 +7,7 @@ rm -rf build && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web"
 
 swiftc -O main.swift -o "$APP/Contents/MacOS/Daytick"
 cp ../index.html ../icon.svg ../icon-512.png "$APP/Contents/Resources/web/"
+cp -R ../fonts "$APP/Contents/Resources/web/"
 
 # App icon from icon-512.png
 ICONSET=build/AppIcon.iconset && mkdir -p $ICONSET
@@ -25,7 +26,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Daytick</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
 </dict></plist>
 PLIST

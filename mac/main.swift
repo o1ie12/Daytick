@@ -4,6 +4,7 @@ import Cocoa
 import WebKit
 import Carbon.HIToolbox
 import ServiceManagement
+import UniformTypeIdentifiers
 
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     let root = Bundle.main.resourceURL!.appendingPathComponent("web")
@@ -15,7 +16,7 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
             task.didFailWithError(URLError(.fileDoesNotExist)); return
         }
         let types = ["html": "text/html", "js": "text/javascript", "svg": "image/svg+xml",
-                     "png": "image/png", "webmanifest": "application/manifest+json"]
+                     "png": "image/png", "webmanifest": "application/manifest+json", "woff2": "font/woff2"]
         let mime = types[file.pathExtension] ?? "application/octet-stream"
         task.didReceive(URLResponse(url: task.request.url!, mimeType: mime,
                                     expectedContentLength: data.count, textEncodingName: "utf-8"))
@@ -89,6 +90,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             applyDockPolicy()
         }
         if body["open"] as? String == "window" { showWindow() }
+        if let json = body["export"] as? String { saveBackup(json, name: body["filename"] as? String, from: message.webView) }
+        if body["import"] as? Bool == true { openBackup(into: message.webView) }
+    }
+
+    // Backups use native Save/Open dialogs; the page builds and restores the JSON.
+    func saveBackup(_ json: String, name: String?, from wv: WKWebView?) {
+        popover.performClose(nil)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = name ?? "daytick-backup.json"
+        panel.allowedContentTypes = [.json]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try json.write(to: url, atomically: true, encoding: .utf8)
+            wv?.evaluateJavaScript("backupSaved()")
+        } catch { alert("Couldn't save the backup", error.localizedDescription) }
+    }
+
+    func openBackup(into wv: WKWebView?) {
+        popover.performClose(nil)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url,
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        let confirm = NSAlert()
+        confirm.messageText = "Restore this backup?"
+        confirm.informativeText = "Your current tasks, history and settings will be replaced."
+        confirm.addButton(withTitle: "Restore")
+        confirm.addButton(withTitle: "Cancel")
+        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+        // Restore in the window's page; the storage event syncs the menu bar panel
+        let target = window.contentView as? WKWebView ?? wv
+        target?.callAsyncJavaScript("return restoreBackup(text)", arguments: ["text": text], in: nil, in: .page) { result in
+            if case .success(let ok) = result, ok as? Bool == false {
+                self.alert("That file isn't a Daytick backup", "Choose a file saved with “save backup”.")
+            }
+        }
+    }
+
+    func alert(_ title: String, _ info: String) {
+        let a = NSAlert(); a.messageText = title; a.informativeText = info; a.runModal()
     }
 
     // Remembered natively too, so a menu-bar-only launch doesn't flash the window or Dock icon
