@@ -50,6 +50,9 @@
   #list li.dragging { opacity:.35; }
   #list li.over-before { box-shadow:0 -2px 0 var(--fg); }
   #list li.over-after { box-shadow:0 2px 0 var(--fg); }
+  .overdue { flex:none; font:500 12px/1 Archivo, sans-serif; color:var(--heat); border:1px solid color-mix(in srgb, var(--heat) 55%, transparent);
+    background:color-mix(in srgb, var(--heat) 12%, transparent); border-radius:999px; padding:3px 7px; cursor:default; white-space:nowrap; }
+  :root[data-compact] .overdue { font-size:11px; padding:2px 6px; }
   .del { color:var(--muted); opacity:0; font-size:14px; } li:hover .del { opacity:1; } .del:hover { color:var(--fg); }
   @media (hover:none) { .del { opacity:1; } }
   .count { margin-top:24px; color:var(--muted); font-size:13px; }
@@ -201,6 +204,7 @@
 
     <h2>updates</h2>
     <ul class="changelog">
+      <li><b>1.3</b> · Oct 2026 — unfinished tasks carry over with a small ↻ tag showing how many days they've been waiting.</li>
       <li><b>1.2.1</b> · Oct 2026 — the menu bar panel now opens over full-screen apps and on every desktop.</li>
       <li><b>1.2</b> · Oct 2026 — tasks-left count in the menu bar, full keyboard control, welcome tasks for new users.</li>
       <li><b>1.1</b> · Oct 2026 — drag tasks to reorder, back up and restore your data, fonts built in so Daytick works fully offline.</li>
@@ -224,8 +228,8 @@
   let settings = { font:'m', menubar:'full', dock:'on', count:'on' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
   let sideOpen = false;
-  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.2.1';
-  // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
+  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.3';
+  // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null, addedOn: 'YYYY-MM-DD' }
   let todos = [], selected = null;
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
   // First launch: a few example tasks that teach the basics
@@ -236,12 +240,12 @@
         'Double-click a task to edit it',
         'Drag tasks to put them in order',
         ctx ? 'Press ⌥⌘T anywhere to open Daytick' : 'Use ↑ ↓ and space to work from the keyboard',
-      ].map(text => ({ id: crypto.randomUUID(), text, done: false, doneOn: null }));
+      ].map(text => ({ id: crypto.randomUUID(), text, done: false, doneOn: null, addedOn: ymd(new Date()) }));
       localStorage.setItem('daytick-welcomed', '1');
       localStorage.setItem(KEY, JSON.stringify(todos));
     }
   } catch {}
-  todos.forEach(t => { t.id ??= crypto.randomUUID(); if (t.done && !t.doneOn) t.doneOn = ymd(new Date()); });
+  todos.forEach(t => { t.id ??= crypto.randomUUID(); t.addedOn ??= ymd(new Date()); if (t.done && !t.doneOn) t.doneOn = ymd(new Date()); });
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(todos)); } catch {} };
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}) => Object.assign(document.createElement(tag), props);
@@ -250,6 +254,7 @@
   function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
   const today = () => ymd(new Date());
   const isArchived = t => t.done && t.doneOn < today();
+  const daysBetween = (a, b) => a ? Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 864e5) : 0;
   const remove = t => { todos = todos.filter(x => x !== t); };
 
   function row(t, draggable = false) {
@@ -267,7 +272,13 @@
     };
     const del = el('button', { className:'del', textContent:'✕', title:'Delete' });
     del.onclick = () => { remove(t); update(); };
-    li.append(cb, span, del);
+    li.append(cb, span);
+    const late = !t.done && daysBetween(t.addedOn, today());
+    if (late > 0) li.append(el('small', {
+      className:'overdue', textContent:`↻ ${late}d`,
+      title:`Carried over from ${new Date(t.addedOn + 'T00:00').toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' })}`
+    }));
+    li.append(del);
     return li;
   }
 
@@ -391,7 +402,7 @@
   $('f').onsubmit = e => {
     e.preventDefault();
     const text = $('new').value.trim();
-    if (text) { todos.push({ id:crypto.randomUUID(), text, done:false, doneOn:null }); $('new').value = ''; update(); }
+    if (text) { todos.push({ id:crypto.randomUUID(), text, done:false, doneOn:null, addedOn:today() }); $('new').value = ''; update(); }
   };
 
   const setThemeLabel = () => $('themeLabel').textContent = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
@@ -448,7 +459,8 @@
     let d; try { d = JSON.parse(text); } catch { backupMsg("That file isn't a Daytick backup."); return false; }
     if (d?.app !== 'daytick' || !Array.isArray(d.todos)) { backupMsg("That file isn't a Daytick backup."); return false; }
     todos = d.todos.filter(t => t && typeof t.text === 'string').map(t => ({
-      id: t.id || crypto.randomUUID(), text: t.text, done: !!t.done, doneOn: t.done ? (t.doneOn || today()) : null
+      id: t.id || crypto.randomUUID(), text: t.text, done: !!t.done, doneOn: t.done ? (t.doneOn || today()) : null,
+      addedOn: t.addedOn || today()
     }));
     if (d.settings) Object.assign(settings, d.settings);
     try {

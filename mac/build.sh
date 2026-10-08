@@ -26,7 +26,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Daytick</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.2.1</string>
+  <key>CFBundleShortVersionString</key><string>1.3</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
 </dict></plist>
 PLIST
