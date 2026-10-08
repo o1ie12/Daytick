@@ -42,8 +42,9 @@ This removes the "downloaded from the internet" flag so macOS stops asking.
 - Tasks you finish stay crossed off for the rest of the day, then move into your history.
 - The heatmap shows how many tasks you finished each day (brighter = more, up to 10). Click a day to see what you did.
 - **Menu bar:** click the ☑ icon or press **⌥⌘T** anywhere. Right-click it for **Open Daytick**, **Open at Login** and **Quit**.
-- **Settings** (bottom of the list): font size, menu bar layout — *Full* or *Minimal* (just your list, with a button to slide out your streak and history) — and **Show in Dock**. Turn it off to keep Daytick in the menu bar only; open the full app with **open daytick ↗** at the bottom of the menu bar panel.
+- **Settings** (bottom of the list): font size, menu bar layout — *Full* or *Minimal* (just your list, with a button to slide out your streak and history) — **count in menu bar** (tasks left next to the icon) and **Show in Dock**. Turn it off to keep Daytick in the menu bar only; open the full app with **open daytick ↗** at the bottom of the menu bar panel.
 
+- **Keyboard:** **↓/↑** move between tasks · **space** ticks off · **return** edits · **⌫** deletes · **⌘↑/⌘↓** reorder · **esc** back to the input.
 - **Backup:** Settings → **save backup** writes your tasks, history and settings to a file. **restore…** loads one back — handy when moving to a new Mac.
 
 ## Web version

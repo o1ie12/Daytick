@@ -55,10 +55,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         popover.contentSize = panelView.frame.size
         popover.behavior = .transient
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "checkmark.square", accessibilityDescription: "Daytick")
         statusItem.button?.action = #selector(clicked)
         statusItem.button?.target = self
+        statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         // Main window
@@ -90,6 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             applyDockPolicy()
         }
         if body["open"] as? String == "window" { showWindow() }
+        // Tasks left, shown next to the menu bar icon (0 hides it)
+        if let n = body["count"] as? Int {
+            statusItem.button?.title = n > 0 ? " \(n)" : ""
+        }
         if let json = body["export"] as? String { saveBackup(json, name: body["filename"] as? String, from: message.webView) }
         if body["import"] as? Bool == true { openBackup(into: message.webView) }
     }

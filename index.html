@@ -117,6 +117,10 @@
   .settings-link:hover { color:var(--fg); }
   .links { display:flex; gap:20px; margin-top:40px; } .links .settings-link { margin-top:0; }
   :root:not([data-ctx=panel]) .panel-only { display:none; }
+  .keys { margin:0; } .keys li { display:block; padding:3px 0; font-size:13px; color:var(--muted); }
+  kbd { font:500 11px/1 Archivo, sans-serif; color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:3px 5px; }
+  :root:not([data-ctx]) .mac-only-inline { display:none !important; }
+  #list li:focus { outline:none; } #list li:focus-visible { box-shadow:-12px 0 0 -9px var(--fg); }
   .row-btns { display:flex; gap:10px; flex-wrap:wrap; }
   .btn { border:1.5px solid var(--fg); padding:6px 14px; font-size:14px; }
   .btn:hover { background:var(--fg); color:var(--bg); }
@@ -173,10 +177,22 @@
       <h2>menu bar layout</h2>
       <div class="seg" data-setting="menubar"><button data-v="minimal">minimal</button><button data-v="full">full</button></div>
       <p>Minimal shows only your list in the menu bar, with a side panel for your streak and history. The app window always shows everything.</p>
+      <h2>count in menu bar</h2>
+      <div class="seg" data-setting="count"><button data-v="on">on</button><button data-v="off">off</button></div>
+      <p>Shows how many tasks are left next to the menu bar icon.</p>
       <h2>show in dock</h2>
       <div class="seg" data-setting="dock"><button data-v="on">on</button><button data-v="off">off</button></div>
       <p>Off keeps Daytick in the menu bar only. Open the full app from the button at the bottom of the menu bar panel.</p>
     </div>
+    <h2>keyboard</h2>
+    <ul class="keys">
+      <li><kbd>↓</kbd> <kbd>↑</kbd> move between tasks</li>
+      <li><kbd>space</kbd> tick off · <kbd>return</kbd> edit · <kbd>⌫</kbd> delete</li>
+      <li><kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd> move a task up or down</li>
+      <li><kbd>esc</kbd> back to the input</li>
+      <li class="mac-only-inline"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd> open the menu bar panel from anywhere</li>
+    </ul>
+
     <h2>backup</h2>
     <div class="row-btns"><button class="btn" id="exportBtn">save backup</button><button class="btn" id="importBtn">restore…</button></div>
     <p>Saves your tasks, history and settings to a file. Restoring replaces what's here now.</p>
@@ -185,6 +201,7 @@
 
     <h2>updates</h2>
     <ul class="changelog">
+      <li><b>1.2</b> · Oct 2026 — tasks-left count in the menu bar, full keyboard control, welcome tasks for new users.</li>
       <li><b>1.1</b> · Oct 2026 — drag tasks to reorder, back up and restore your data, fonts built in so Daytick works fully offline.</li>
       <li><b>1.0</b> · Oct 2026 — first release: daily list, streak heatmap, light and dark themes, Mac app with menu bar panel.</li>
     </ul>
@@ -203,13 +220,26 @@
   const KEY = 'minimal-todo', SKEY = 'minimal-todo-settings', WEEKS = 20;
   // Where the page is running: 'panel' (Mac menu bar), 'window' (Mac app) or null (browser)
   const ctx = new URLSearchParams(location.search).get('ctx');
-  let settings = { font:'m', menubar:'full', dock:'on' };
+  let settings = { font:'m', menubar:'full', dock:'on', count:'on' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY))); } catch {}
   let sideOpen = false;
-  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.1';
+  const PANEL_W = 340, SIDE_W = 300, VERSION = '1.2';
   // Task: { id, text, done, doneOn: 'YYYY-MM-DD' | null }
   let todos = [], selected = null;
   try { todos = JSON.parse(localStorage.getItem(KEY)) || []; } catch {}
+  // First launch: a few example tasks that teach the basics
+  try {
+    if (localStorage.getItem(KEY) === null && !localStorage.getItem('daytick-welcomed')) {
+      todos = [
+        'Welcome to Daytick — tick this off',
+        'Double-click a task to edit it',
+        'Drag tasks to put them in order',
+        ctx ? 'Press ⌥⌘T anywhere to open Daytick' : 'Use ↑ ↓ and space to work from the keyboard',
+      ].map(text => ({ id: crypto.randomUUID(), text, done: false, doneOn: null }));
+      localStorage.setItem('daytick-welcomed', '1');
+      localStorage.setItem(KEY, JSON.stringify(todos));
+    }
+  } catch {}
   todos.forEach(t => { t.id ??= crypto.randomUUID(); if (t.done && !t.doneOn) t.doneOn = ymd(new Date()); });
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(todos)); } catch {} };
   const $ = id => document.getElementById(id);
@@ -223,6 +253,7 @@
 
   function row(t, draggable = false) {
     const li = el('li', { className: t.done ? 'done' : '' });
+    if (draggable) li.tabIndex = -1;
     li.dataset.id = t.id;
     if (draggable) makeDraggable(li, t);
     const cb = el('input', { type:'checkbox', className:'box', checked:t.done });
@@ -315,11 +346,43 @@
       done.length ? (() => { const ul = el('ul'); ul.append(...done.map(t => row(t))); return ul; })() : el('p', { textContent:'nothing done this day' }));
   }
 
+  // Keyboard: arrows move focus, space ticks, return edits, ⌫ deletes, ⌘↑/⌘↓ reorder, esc returns to input
+  const rows = () => [...$('list').children];
+  const focusTask = id => { const li = rows().find(x => x.dataset.id === id); li ? li.focus() : $('new').focus(); };
+  document.addEventListener('keydown', e => {
+    const li = e.target.closest?.('#list li');
+    if (e.target === $('new') && e.key === 'ArrowDown' && rows()[0]) { e.preventDefault(); rows()[0].focus(); return; }
+    if (!li || e.target.isContentEditable) {
+      if (e.key === 'Escape' && !e.target.isContentEditable && !$('settings').hidden) showSettings(false);
+      else if (e.key === 'Escape' && !e.target.isContentEditable) $('new').focus();
+      return;
+    }
+    const list = rows(), i = list.indexOf(li), t = todos.find(x => x.id === li.dataset.id);
+    if (e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      const other = list[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      if (other) { moveTask(t.id, other.dataset.id, e.key === 'ArrowDown'); focusTask(t.id); }
+      return;
+    }
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); list[i + 1]?.focus(); break;
+      case 'ArrowUp': e.preventDefault(); (list[i - 1] || $('new')).focus(); break;
+      case ' ': e.preventDefault(); t.done = !t.done; t.doneOn = t.done ? today() : null; update(); focusTask(t.id); break;
+      case 'Enter': e.preventDefault(); li.querySelector('span').dispatchEvent(new MouseEvent('dblclick')); break;
+      case 'Backspace': case 'Delete': {
+        e.preventDefault(); const next = list[i + 1] || list[i - 1];
+        remove(t); update(); next ? focusTask(next.dataset.id) : $('new').focus(); break;
+      }
+      case 'Escape': $('new').focus(); break;
+    }
+  });
+
   function render() {
     const active = todos.filter(t => !isArchived(t));
     $('list').replaceChildren(...active.map(t => row(t, true)));
     const left = active.filter(t => !t.done).length;
     $('count').textContent = active.length ? `${left} left` : '';
+    window.webkit?.messageHandlers?.todo?.postMessage({ count: settings.count === 'off' ? 0 : left });
     renderStats();
   }
   function update() { save(); render(); }
@@ -355,6 +418,7 @@
     const mac = window.webkit?.messageHandlers?.todo;
     if (ctx === 'panel') mac?.postMessage({ panelWidth: PANEL_W + (sideOpen ? SIDE_W : 0) });
     mac?.postMessage({ dock: settings.dock !== 'off' });
+    render();
   }
   document.querySelectorAll('.seg').forEach(seg => seg.onclick = e => {
     const v = e.target.dataset.v; if (!v) return;
